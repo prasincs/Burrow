@@ -18,7 +18,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
-	"github.com/linkedin/Burrow/protocol"
+	"github.com/prasincs/Burrow/protocol"
 )
 
 type OffsetStorage struct {
