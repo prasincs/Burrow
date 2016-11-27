@@ -18,7 +18,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
-	"github.com/prasincs/Burrow/protocol"
+	"github.com/linkedin/Burrow/protocol"
 )
 
 type OffsetStorage struct {
@@ -318,6 +318,15 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 
 func (storage *OffsetStorage) Stop() {
 	close(storage.quit)
+}
+
+func (storage *OffsetStorage) Offsets(cluster string) (*ClusterOffsets, error) {
+	// Make sure the cluster exists
+	clusterMap, ok := storage.offsets[cluster]
+	if !ok {
+		return nil, fmt.Errorf("No cluster named %s", cluster)
+	}
+	return clusterMap, nil
 }
 
 func (storage *OffsetStorage) dropGroup(cluster string, group string, resultChannel chan protocol.StatusConstant) {
