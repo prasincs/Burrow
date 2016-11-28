@@ -348,13 +348,12 @@ func (storage *OffsetStorage) Offsets(cluster string) (*ClusterOffsetResponse, e
 	}
 	storage.offsets[cluster].brokerLock.RUnlock()
 	storage.offsets[cluster].consumerLock.RLock()
-	log.Tracef("consumerOffsets: %#v", clusterOffsets.consumer)
+	//log.Tracef("consumerOffsets: %#v", clusterOffsets.consumer)
 	for consumerGroup, consumerOffsetArr := range clusterOffsets.consumer {
 		if consumerOffsetArr != nil {
 			topicPartitionMap := make(map[string][]protocol.ConsumerOffset)
 
 			for topic, partition := range consumerOffsetArr {
-				log.Infof("partition: %#v", partition)
 				consumers := []protocol.ConsumerOffset{}
 				for _, cons := range partition {
 					if cons == nil {
@@ -362,7 +361,7 @@ func (storage *OffsetStorage) Offsets(cluster string) (*ClusterOffsetResponse, e
 					}
 					if cons.Value != nil {
 						consOffset := *(cons.Value.(*protocol.ConsumerOffset))
-						log.Tracef("Offsets: %#v", consOffset)
+						//log.Tracef("Offsets: %#v", consOffset)
 						consumers = append(consumers, consOffset)
 
 					}
