@@ -15,7 +15,6 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"errors"
-	"strconv"
 	"sync"
 	"time"
 
@@ -45,8 +44,6 @@ type BrokerTopicRequest struct {
 	Topic  string
 }
 
-var defaultKafkaPort = 9092
-
 func NewKafkaClient(app *ApplicationContext, cluster string) (*KafkaClient, error) {
 	// Set up sarama config from profile
 	clientConfig := sarama.NewConfig()
@@ -56,15 +53,7 @@ func NewKafkaClient(app *ApplicationContext, cluster string) (*KafkaClient, erro
 	clientConfig.Net.TLS.Config = &tls.Config{}
 	clientConfig.Net.TLS.Config.InsecureSkipVerify = profile.TLSNoVerify
 	brokers := app.Config.Kafka[cluster].Brokers
-	port := app.Config.Kafka[cluster].BrokerPort
-	if port != defaultKafkaPort {
-		mBrokers := []string{}
-		for _, broker := range brokers {
-			mBrokers = append(mBrokers, broker+":"+strconv.Itoa(port))
-		}
-		brokers = mBrokers
-	}
-
+	///port := app.Config.Kafka[cluster].BrokerPort
 	sclient, err := sarama.NewClient(brokers, clientConfig)
 	if err != nil {
 		return nil, err

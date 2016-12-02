@@ -125,6 +125,7 @@ func NewOffsetStorage(app *ApplicationContext) (*OffsetStorage, error) {
 		for {
 			select {
 			case o := <-storage.offsetChannel:
+				log.Infof("received on offset channel. %#v", o)
 				if o.Group == "" {
 					go storage.addBrokerOffset(o)
 				} else {
@@ -151,6 +152,7 @@ func NewOffsetStorage(app *ApplicationContext) (*OffsetStorage, error) {
 					// Silently drop unknown requests
 				}
 			case <-storage.quit:
+				log.Info("Quitting")
 				return
 			}
 		}
@@ -288,8 +290,11 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		}
 	}
 
+	log.Debugf("Calculating lag for group=%s, %s:%d", offset.Group, offset.Topic, offset.Partition)
+
 	// Calculate the lag against the brokerOffset
 	partitionLag := brokerOffset - offset.Offset
+	log.Debugf("Calculated lag for group=%s, %s:%d, lag=%d", offset.Group, offset.Topic, offset.Partition, partitionLag)
 	if partitionLag < 0 {
 		// Little bit of a hack - because we only get broker offsets periodically, it's possible the consumer offset could be ahead of where we think the broker
 		// is. In this case, just mark it as zero lag.
@@ -755,6 +760,7 @@ func (storage *OffsetStorage) AcceptConsumerGroup(group string) bool {
 		return false
 	}
 
+	log.Infof("Accepting group: %s", group)
 	// good to go
 	return true
 }
