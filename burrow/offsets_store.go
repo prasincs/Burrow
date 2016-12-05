@@ -12,6 +12,7 @@ package burrow
 
 import (
 	"container/ring"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sync"
@@ -196,6 +197,47 @@ func (storage *OffsetStorage) addBrokerOffset(offset *protocol.PartitionOffset) 
 	clusterMap.brokerLock.Unlock()
 }
 
+func (storage *OffsetStorage) Refresh(cluster string, responseOffsets chan *ResponseOffsets, consumerGroupStatusChan chan *protocol.ConsumerGroupStatus) error {
+	//topicsRequest := &RequestTopicList{Result: make(chan *ResponseTopicList), Cluster: cluster}
+	//storage.requestChannel <- topicsRequest
+	//topicsResult := <-topicsRequest.Result
+
+	consumerGroupsRequest := &RequestConsumerList{Result: make(chan []string), Cluster: cluster}
+	storage.requestChannel <- consumerGroupsRequest
+
+	consumers := <-consumerGroupsRequest.Result
+
+	//for _, topic := range topicsResult.TopicList {
+	for _, group := range consumers {
+
+		go func(cluster string, group string) {
+			consumerStatusRequest := &RequestConsumerStatus{Result: make(chan *protocol.ConsumerGroupStatus), Cluster: cluster, Group: group, Showall: true}
+			storage.requestChannel <- consumerStatusRequest
+			result := <-consumerStatusRequest.Result
+			log.Infof("result: %v", result)
+			select {
+			case consumerGroupStatusChan <- result:
+			default:
+				/*drop*/
+			}
+			for _, partition := range result.Partitions {
+				log.Infof("result:partition: %v", partition)
+				topic := partition.Topic
+				go func(cluster, topic, group string) {
+					//for topic := range
+					offsetRequest := &RequestOffsets{Result: make(chan *ResponseOffsets), Cluster: cluster, Topic: topic, Group: group}
+					storage.requestChannel <- offsetRequest
+					offsets := <-offsetRequest.Result
+					responseOffsets <- offsets
+					fmt.Printf("topic=%s offsets: %v", topic, offsets)
+				}(cluster, topic, group)
+			}
+		}(cluster, group)
+	}
+	//}
+	return nil
+}
+
 func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset) {
 	// Ignore offsets for clusters that we don't know about - should never happen anyways
 	clusterOffsets, ok := storage.offsets[offset.Cluster]
@@ -339,6 +381,8 @@ func (storage *OffsetStorage) Offsets(cluster string) (*ClusterOffsetResponse, e
 	if !ok {
 		return nil, fmt.Errorf("No cluster named %s", cluster)
 	}
+	out, _ := json.Marshal(clusterOffsets)
+	log.Infof("clusterOffsets: %s", string(out))
 	clusterOffsetResponse := &ClusterOffsetResponse{
 		Brokers:   make(map[string][]BrokerOffset, len(clusterOffsets.broker)),
 		Consumers: make(map[string]map[string][]protocol.ConsumerOffset, len(clusterOffsets.consumer)),
