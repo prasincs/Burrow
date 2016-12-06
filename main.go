@@ -149,6 +149,20 @@ func burrowMain() int {
 		appContext.Storms[cluster] = &burrow.StormCluster{Storm: stormClient}
 	}
 
+	// Start Storm Clients for each storm cluster
+	appContext.Secors = make(map[string]*burrow.SecorCluster, len(appContext.Config.Secor))
+	for cluster, _ := range appContext.Config.Secor {
+		log.Infof("Starting Storm client for cluster %s", cluster)
+		secorClient, err := burrow.NewSecorClient(appContext, cluster)
+		if err != nil {
+			log.Criticalf("Cannot start Storm client for cluster %s: %v", cluster, err)
+			return 1
+		}
+		defer secorClient.Stop()
+
+		appContext.Secors[cluster] = &burrow.SecorCluster{Secor: secorClient}
+	}
+
 	// Set up the Zookeeper lock for notification
 	appContext.NotifierLock = zk.NewLock(zkconn, appContext.Config.Zookeeper.LockPath, zk.WorldACL(zk.PermAll))
 

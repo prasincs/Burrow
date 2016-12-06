@@ -60,6 +60,11 @@ type BurrowConfig struct {
 		ZookeeperPort int      `gcfg:"zookeeper-port"`
 		ZookeeperPath string   `gcfg:"zookeeper-path"`
 	}
+	Secor map[string]*struct {
+		Zookeepers    []string `gcfg:"zookeeper"`
+		ZookeeperPort int      `gcfg:"zookeeper-port"`
+		ZookeeperPath string   `gcfg:"zookeeper-path"`
+	}
 	Tickers struct {
 		BrokerOffsets int `gcfg:"broker-offsets"`
 	}
@@ -71,6 +76,7 @@ type BurrowConfig struct {
 		ZKGroupRefresh    int64 `gcfg:"zk-group-refresh"`
 		StormCheck        int64 `gcfg:"storm-interval"`
 		StormGroupRefresh int64 `gcfg:"storm-group-refresh"`
+		SecorCheck        int64 `gcfg:"secor-interval"`
 	}
 	Httpserver struct {
 		Enable bool `gcfg:"server"`
