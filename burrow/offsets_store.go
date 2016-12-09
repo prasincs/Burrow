@@ -126,7 +126,7 @@ func NewOffsetStorage(app *ApplicationContext) (*OffsetStorage, error) {
 		for {
 			select {
 			case o := <-storage.offsetChannel:
-				log.Infof("received on offset channel. %#v", o)
+				//log.Infof("received on offset channel. %#v", o)
 				if o.Group == "" {
 					go storage.addBrokerOffset(o)
 				} else {
@@ -153,7 +153,6 @@ func NewOffsetStorage(app *ApplicationContext) (*OffsetStorage, error) {
 					// Silently drop unknown requests
 				}
 			case <-storage.quit:
-				log.Info("Quitting")
 				return
 			}
 		}
