@@ -803,7 +803,6 @@ func (storage *OffsetStorage) AcceptConsumerGroup(group string) bool {
 		return false
 	}
 
-	log.Infof("Accepting group: %s", group)
 	// good to go
 	return true
 }
