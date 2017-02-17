@@ -238,6 +238,7 @@ func (storage *OffsetStorage) Refresh(cluster string, responseOffsets chan *Resp
 }
 
 func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset) {
+	var timestampDifference int64
 	// Ignore offsets for clusters that we don't know about - should never happen anyways
 	clusterOffsets, ok := storage.offsets[offset.Cluster]
 	if !ok {
@@ -310,7 +311,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		consumerPartitionRing = consumerTopicMap[offset.Partition]
 	} else {
 		lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
-		timestampDifference := offset.Timestamp - lastOffset.Timestamp
+		timestampDifference = offset.Timestamp - lastOffset.Timestamp
 
 		// Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
 		if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
@@ -340,6 +341,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		// Little bit of a hack - because we only get broker offsets periodically, it's possible the consumer offset could be ahead of where we think the broker
 		// is. In this case, just mark it as zero lag.
 		partitionLag = 0
+		timestampDifference = 0
 	}
 
 	// Update or create the ring value at the current pointer
@@ -354,6 +356,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		ringval, _ := consumerPartitionRing.Value.(*protocol.ConsumerOffset)
 		ringval.Offset = offset.Offset
 		ringval.Timestamp = offset.Timestamp
+		ringval.TimeLag = timestampDifference
 		ringval.Lag = partitionLag
 		ringval.Artificial = false
 	}
