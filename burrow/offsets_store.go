@@ -341,6 +341,10 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		// Little bit of a hack - because we only get broker offsets periodically, it's possible the consumer offset could be ahead of where we think the broker
 		// is. In this case, just mark it as zero lag.
 		partitionLag = 0
+
+	}
+
+	if timestampDifference < 0 {
 		timestampDifference = 0
 	}
 
