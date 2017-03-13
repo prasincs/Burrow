@@ -94,6 +94,7 @@ func (secorClient *SecorClient) getOffsetsForPartition(topic string, partition i
 		partitionOffset := &protocol.PartitionOffset{
 			Cluster:   secorClient.cluster,
 			Topic:     topic,
+			Source:    "secor",
 			Partition: int32(partition),
 			Group:     "secor_backup-" + topic,
 			Timestamp: int64(zkNodeStat.Mtime), // note: this is millis

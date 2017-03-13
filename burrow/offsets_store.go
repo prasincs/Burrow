@@ -12,7 +12,6 @@ package burrow
 
 import (
 	"container/ring"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"sync"
@@ -130,6 +129,9 @@ func NewOffsetStorage(app *ApplicationContext) (*OffsetStorage, error) {
 				if o.Group == "" {
 					go storage.addBrokerOffset(o)
 				} else {
+					if o.Source == "" {
+						fmt.Printf("OH NO!! Consumer Source is empty for %#v\n", o)
+					}
 					go storage.addConsumerOffset(o)
 				}
 			case r := <-storage.requestChannel:
@@ -213,14 +215,14 @@ func (storage *OffsetStorage) Refresh(cluster string, responseOffsets chan *Resp
 			consumerStatusRequest := &RequestConsumerStatus{Result: make(chan *protocol.ConsumerGroupStatus), Cluster: cluster, Group: group, Showall: true}
 			storage.requestChannel <- consumerStatusRequest
 			result := <-consumerStatusRequest.Result
-			log.Infof("result: %v", result)
+			//log.Infof("result: %v", result)
 			select {
 			case consumerGroupStatusChan <- result:
 			default:
 				/*drop*/
 			}
 			for _, partition := range result.Partitions {
-				log.Infof("result:partition: %v", partition)
+				//log.Infof("result:partition: %v", partition)
 				topic := partition.Topic
 				go func(cluster, topic, group string) {
 					//for topic := range
@@ -228,7 +230,7 @@ func (storage *OffsetStorage) Refresh(cluster string, responseOffsets chan *Resp
 					storage.requestChannel <- offsetRequest
 					offsets := <-offsetRequest.Result
 					responseOffsets <- offsets
-					fmt.Printf("topic=%s offsets: %v", topic, offsets)
+					//fmt.Printf("topic=%s offsets: %v", topic, offsets)
 				}(cluster, topic, group)
 			}
 		}(cluster, group)
@@ -352,6 +354,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 	if consumerPartitionRing.Value == nil {
 		consumerPartitionRing.Value = &protocol.ConsumerOffset{
 			Offset:     offset.Offset,
+			Source:     offset.Source,
 			Timestamp:  offset.Timestamp,
 			Lag:        partitionLag,
 			Artificial: false,
@@ -359,14 +362,15 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 	} else {
 		ringval, _ := consumerPartitionRing.Value.(*protocol.ConsumerOffset)
 		ringval.Offset = offset.Offset
+		ringval.Source = offset.Source
 		ringval.Timestamp = offset.Timestamp
 		ringval.TimeLag = timestampDifference
 		ringval.Lag = partitionLag
 		ringval.Artificial = false
 	}
 
-	log.Tracef("Commit offset: cluster=%s topic=%s partition=%v group=%s timestamp=%v offset=%v lag=%v",
-		offset.Cluster, offset.Topic, offset.Partition, offset.Group, offset.Timestamp, offset.Offset,
+	log.Tracef("Commit offset: cluster=%s topic=%s partition=%v group=%s timestamp=%v offset=%v source=%s lag=%v",
+		offset.Cluster, offset.Topic, offset.Partition, offset.Group, offset.Timestamp, offset.Offset, offset.Source,
 		partitionLag)
 
 	// Advance the ring pointer
@@ -387,8 +391,8 @@ func (storage *OffsetStorage) Offsets(cluster string) (*ClusterOffsetResponse, e
 	if !ok {
 		return nil, fmt.Errorf("No cluster named %s", cluster)
 	}
-	out, _ := json.Marshal(clusterOffsets)
-	log.Infof("clusterOffsets: %s", string(out))
+	//out, _ := json.Marshal(clusterOffsets)
+	//log.Infof("clusterOffsets: %s", string(out))
 	clusterOffsetResponse := &ClusterOffsetResponse{
 		Brokers:   make(map[string][]BrokerOffset, len(clusterOffsets.broker)),
 		Consumers: make(map[string]map[string][]protocol.ConsumerOffset, len(clusterOffsets.consumer)),
@@ -482,6 +486,8 @@ func (storage *OffsetStorage) evaluateGroup(cluster string, group string, result
 
 	// Scan the offsets table once and store all the offsets for the group locally
 	status.Status = protocol.StatusOK
+	source := ""
+
 	offsetList := make(map[string][][]protocol.ConsumerOffset, len(consumerMap))
 	var youngestOffset int64
 	for topic, partitions := range consumerMap {
@@ -497,6 +503,9 @@ func (storage *OffsetStorage) evaluateGroup(cluster string, group string, result
 
 			// Add an artificial offset commit if the consumer has no lag against the current broker offset
 			lastOffset := offsetRing.Prev().Value.(*protocol.ConsumerOffset)
+			if source == "" {
+				source = lastOffset.Source
+			}
 			if lastOffset.Offset >= clusterMap.broker[topic][partition].Offset {
 				ringval, _ := offsetRing.Value.(*protocol.ConsumerOffset)
 				ringval.Offset = lastOffset.Offset
@@ -534,6 +543,7 @@ func (storage *OffsetStorage) evaluateGroup(cluster string, group string, result
 
 		// Return the group as a 404
 		status.Status = protocol.StatusNotFound
+		status.Source = source
 		resultChannel <- status
 		return
 	}
@@ -643,6 +653,8 @@ func (storage *OffsetStorage) evaluateGroup(cluster string, group string, result
 			}
 		}
 	}
+
+	status.Source = source
 	resultChannel <- status
 }
 

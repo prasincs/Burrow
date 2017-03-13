@@ -17,6 +17,7 @@ import (
 type PartitionOffset struct {
 	Cluster             string
 	Topic               string
+	Source              string
 	Partition           int32
 	Offset              int64
 	Timestamp           int64
@@ -25,11 +26,12 @@ type PartitionOffset struct {
 }
 
 type ConsumerOffset struct {
-	Offset     int64 `json:"offset"`
-	Timestamp  int64 `json:"timestamp"`
-	Lag        int64 `json:"lag"`
-	TimeLag    int64 `json:"timelag"`
-	Artificial bool  `json:"-"`
+	Offset     int64  `json:"offset"`
+	Timestamp  int64  `json:"timestamp"`
+	Source     string `json:"string"`
+	Lag        int64  `json:"lag"`
+	TimeLag    int64  `json:"timelag"`
+	Artificial bool   `json:"-"`
 }
 
 type StatusConstant int
@@ -72,6 +74,7 @@ type ConsumerGroupStatus struct {
 	Cluster         string             `json:"cluster"`
 	Group           string             `json:"group"`
 	Status          StatusConstant     `json:"status"`
+	Source          string             `json:"source"`
 	Complete        bool               `json:"complete"`
 	Partitions      []*PartitionStatus `json:"partitions"`
 	TotalPartitions int                `json:"partition_count"`

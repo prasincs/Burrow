@@ -143,15 +143,22 @@ func (stormClient *StormClient) getOffsetsForConsumerGroup(consumerGroup string)
 func (stormClient *StormClient) getOffsetsForPartition(consumerGroup string, partition int, partitionPath string) {
 	zkNodeStat := &zk.Stat{}
 	stateStr, zkNodeStat, err := stormClient.conn.Get(partitionPath)
+	//currentTime := time.Now()
+	//currentTimeMillis := currentTime.UnixNano() / int64(time.Millisecond)
 	switch {
 	case err == nil:
 		offset, topic, errConversion := parseStormSpoutStateJson(string(stateStr))
 		switch {
 		case errConversion == nil:
 			log.Debugf("About to sync Storm offset: [%s,%s,%v]::[%v,%v]\n", consumerGroup, topic, partition, offset, zkNodeStat.Mtime)
+			//if currentTimeMillis-zkNodeStat.Mtime > 30*86400*1000 {
+			//	log.Warnf("Znode for the group %s was modified more than a month ago, ignoring.", consumerGroup)
+			//	return
+			//}
 			partitionOffset := &protocol.PartitionOffset{
 				Cluster:   stormClient.cluster,
 				Topic:     topic,
+				Source:    "storm",
 				Partition: int32(partition),
 				Group:     consumerGroup,
 				Timestamp: int64(zkNodeStat.Mtime), // note: this is millis

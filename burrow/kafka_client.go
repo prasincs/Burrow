@@ -186,9 +186,11 @@ func (client *KafkaClient) getOffsets() error {
 	for topic, partitions := range client.topicMap {
 		for i := 0; i < partitions; i++ {
 			broker, err := client.client.Leader(topic, int32(i))
+			//log.Infof("broker: %#v", broker)
 			if err != nil {
-				client.topicMapLock.RUnlock()
+				//client.topicMapLock.RUnlock()
 				log.Errorf("Topic leader error on %s:%v: %v", topic, int32(i), err)
+				//continue
 				return err
 			}
 			if _, ok := requests[broker.ID()]; !ok {
@@ -243,6 +245,7 @@ func (client *KafkaClient) getOffsets() error {
 
 func (client *KafkaClient) RefreshTopicMap() {
 	client.topicMapLock.Lock()
+	client.client.RefreshMetadata()
 	topics, _ := client.client.Topics()
 	for _, topic := range topics {
 		partitions, _ := client.client.Partitions(topic)
@@ -334,6 +337,7 @@ func (client *KafkaClient) processConsumerOffsetsMessage(msg *sarama.ConsumerMes
 	partitionOffset := &protocol.PartitionOffset{
 		Cluster:   client.cluster,
 		Topic:     topic,
+		Source:    "kafka",
 		Partition: int32(partition),
 		Group:     group,
 		Timestamp: int64(timestamp),
