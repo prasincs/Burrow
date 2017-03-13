@@ -286,6 +286,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		return
 	}
 	brokerOffset := topicPartitionList[offset.Partition].Offset
+	brokerTimestamp := topicPartitionList[offset.Partition].Timestamp
 	partitionCount := len(topicPartitionList)
 	clusterOffsets.brokerLock.RUnlock()
 
@@ -315,23 +316,23 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
 		timestampDifference = offset.Timestamp - lastOffset.Timestamp
 
-		// Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
-		if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
-			clusterOffsets.consumerLock.Unlock()
-			log.Debugf("Dropped offset (noadvance): cluster=%s topic=%s partition=%v group=%s timestamp=%v offset=%v tsdiff=%v lag=%v",
-				offset.Cluster, offset.Topic, offset.Partition, offset.Group, offset.Timestamp, offset.Offset,
-				timestampDifference, brokerOffset-offset.Offset)
-			return
-		}
+		// // Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
+		// if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
+		// 	clusterOffsets.consumerLock.Unlock()
+		// 	log.Debugf("Dropped offset (noadvance): cluster=%s topic=%s partition=%v group=%s timestamp=%v offset=%v tsdiff=%v lag=%v",
+		// 		offset.Cluster, offset.Topic, offset.Partition, offset.Group, offset.Timestamp, offset.Offset,
+		// 		timestampDifference, brokerOffset-offset.Offset)
+		// 	return
+		// }
 
-		// Prevent new commits that are too fast (less than the min-distance config) if the last offset was not artificial
-		if (!lastOffset.Artificial) && (timestampDifference >= 0) && (timestampDifference < (storage.app.Config.Lagcheck.MinDistance * 1000)) {
-			clusterOffsets.consumerLock.Unlock()
-			log.Debugf("Dropped offset (mindistance): cluster=%s topic=%s partition=%v group=%s timestamp=%v offset=%v tsdiff=%v lag=%v",
-				offset.Cluster, offset.Topic, offset.Partition, offset.Group, offset.Timestamp, offset.Offset,
-				timestampDifference, brokerOffset-offset.Offset)
-			return
-		}
+		// // Prevent new commits that are too fast (less than the min-distance config) if the last offset was not artificial
+		// if (!lastOffset.Artificial) && (timestampDifference >= 0) && (timestampDifference < (storage.app.Config.Lagcheck.MinDistance * 1000)) {
+		// 	clusterOffsets.consumerLock.Unlock()
+		// 	log.Debugf("Dropped offset (mindistance): cluster=%s topic=%s partition=%v group=%s timestamp=%v offset=%v tsdiff=%v lag=%v",
+		// 		offset.Cluster, offset.Topic, offset.Partition, offset.Group, offset.Timestamp, offset.Offset,
+		// 		timestampDifference, brokerOffset-offset.Offset)
+		// 	return
+		// }
 	}
 
 	log.Debugf("Calculating lag for group=%s, %s:%d", offset.Group, offset.Topic, offset.Partition)
@@ -346,8 +347,14 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 
 	}
 
+	timestampDiffFromBroker := brokerTimestamp - offset.Timestamp
+
 	if timestampDifference < 0 {
 		timestampDifference = 0
+	}
+
+	if timestampDiffFromBroker < 0 {
+		timestampDiffFromBroker = 0
 	}
 
 	// Update or create the ring value at the current pointer
@@ -356,6 +363,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 			Offset:     offset.Offset,
 			Source:     offset.Source,
 			Timestamp:  offset.Timestamp,
+			TimeLag:    timestampDiffFromBroker,
 			Lag:        partitionLag,
 			Artificial: false,
 		}
@@ -364,7 +372,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		ringval.Offset = offset.Offset
 		ringval.Source = offset.Source
 		ringval.Timestamp = offset.Timestamp
-		ringval.TimeLag = timestampDifference
+		ringval.TimeLag = timestampDiffFromBroker
 		ringval.Lag = partitionLag
 		ringval.Artificial = false
 	}
