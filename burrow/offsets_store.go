@@ -286,7 +286,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		return
 	}
 	brokerOffset := topicPartitionList[offset.Partition].Offset
-	brokerTimestamp := topicPartitionList[offset.Partition].Timestamp
+	//brokerTimestamp := topicPartitionList[offset.Partition].Timestamp
 	partitionCount := len(topicPartitionList)
 	clusterOffsets.brokerLock.RUnlock()
 
@@ -308,6 +308,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		}
 	}
 
+	rate := 0.0
 	consumerPartitionRing := consumerTopicMap[offset.Partition]
 	if consumerPartitionRing == nil {
 		consumerTopicMap[offset.Partition] = ring.New(storage.app.Config.Lagcheck.Intervals)
@@ -316,6 +317,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
 		timestampDifference = offset.Timestamp - lastOffset.Timestamp
 
+		rate = float64(lastOffset.Offset-offset.Offset) / float64(timestampDifference)
 		// // Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
 		// if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
 		// 	clusterOffsets.consumerLock.Unlock()
@@ -347,14 +349,14 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 
 	}
 
-	timestampDiffFromBroker := brokerTimestamp - offset.Timestamp
+	lagTime := int64(float64(brokerOffset-offset.Offset) / rate)
 
 	if timestampDifference < 0 {
 		timestampDifference = 0
 	}
 
-	if timestampDiffFromBroker < 0 {
-		timestampDiffFromBroker = 0
+	if lagTime < 0 {
+		lagTime = 0
 	}
 
 	// Update or create the ring value at the current pointer
@@ -363,7 +365,8 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 			Offset:     offset.Offset,
 			Source:     offset.Source,
 			Timestamp:  offset.Timestamp,
-			TimeLag:    timestampDiffFromBroker,
+			TimeLag:    lagTime,
+			Rate:       rate,
 			Lag:        partitionLag,
 			Artificial: false,
 		}
@@ -372,8 +375,9 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		ringval.Offset = offset.Offset
 		ringval.Source = offset.Source
 		ringval.Timestamp = offset.Timestamp
-		ringval.TimeLag = timestampDiffFromBroker
+		ringval.TimeLag = lagTime
 		ringval.Lag = partitionLag
+		ringval.Rate = -1
 		ringval.Artificial = false
 	}
 

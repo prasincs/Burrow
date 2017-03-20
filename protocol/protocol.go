@@ -26,12 +26,13 @@ type PartitionOffset struct {
 }
 
 type ConsumerOffset struct {
-	Offset     int64  `json:"offset"`
-	Timestamp  int64  `json:"timestamp"`
-	Source     string `json:"string"`
-	Lag        int64  `json:"lag"`
-	TimeLag    int64  `json:"timelag"`
-	Artificial bool   `json:"-"`
+	Offset     int64   `json:"offset"`
+	Timestamp  int64   `json:"timestamp"`
+	Source     string  `json:"string"`
+	Lag        int64   `json:"lag"`
+	Rate       float64 `json:"rate"`
+	TimeLag    int64   `json:"timelag"`
+	Artificial bool    `json:"-"`
 }
 
 type StatusConstant int

@@ -152,7 +152,7 @@ func (stormClient *StormClient) getOffsetsForPartition(consumerGroup string, par
 		case errConversion == nil:
 			log.Debugf("About to sync Storm offset: [%s,%s,%v]::[%v,%v]\n", consumerGroup, topic, partition, offset, zkNodeStat.Mtime)
 			//if currentTimeMillis-zkNodeStat.Mtime > 30*86400*1000 {
-			//	log.Warnf("Znode for the group %s was modified more than a month ago, ignoring.", consumerGroup)
+			//	l-og.Warnf("Znode for the group %s was modified more than a month ago, ignoring.", consumerGroup)
 			//	return
 			//}
 			partitionOffset := &protocol.PartitionOffset{
