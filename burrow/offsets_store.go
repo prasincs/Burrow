@@ -315,8 +315,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		consumerPartitionRing = consumerTopicMap[offset.Partition]
 	} else {
 		lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
-		timestampDifference = offset.Timestamp - lastOffset.Timestamp
-
+		timestampDifference = time.Now().Unix() - lastOffset.Timestamp
 		rate = float64(lastOffset.Offset-offset.Offset) / float64(timestampDifference)
 		// // Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
 		// if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
