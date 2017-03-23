@@ -315,7 +315,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		consumerPartitionRing = consumerTopicMap[offset.Partition]
 	} else {
 		lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
-		timestampDifference = time.Now().Unix() - lastOffset.Timestamp
+		timestampDifference = offset.Timestamp - lastOffset.Timestamp
 		rate = float64(lastOffset.Offset-offset.Offset) / float64(timestampDifference)
 		// // Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
 		// if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
@@ -340,7 +340,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 
 	// Calculate the lag against the brokerOffset
 	partitionLag := brokerOffset - offset.Offset
-	log.Debugf("Calculated lag for group=%s, %s:%d, lag=%d", offset.Group, offset.Topic, offset.Partition, partitionLag)
+
 	if partitionLag < 0 {
 		// Little bit of a hack - because we only get broker offsets periodically, it's possible the consumer offset could be ahead of where we think the broker
 		// is. In this case, just mark it as zero lag.
@@ -353,7 +353,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 	if timestampDifference < 0 {
 		timestampDifference = 0
 	}
-
+	log.Debugf("Calculated lag for group=%s, %s:%d, lag=%d, timelag=%d (ms)", offset.Group, offset.Topic, offset.Partition, partitionLag, lagTime)
 	if lagTime < 0 {
 		lagTime = 0
 	}
