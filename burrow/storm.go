@@ -99,13 +99,13 @@ func parsePartitionId(partitionStr string) (int, error) {
 	}
 }
 
-func parseStormSpoutStateJson(stateStr string) (int, string, error) {
+func parseStormSpoutStateJson(stateStr string) (string, int, string, error) {
 	stateJson := new(SpoutState)
 	if err := json.Unmarshal([]byte(stateStr), &stateJson); err == nil {
 		log.Debugf("Parsed storm state [%s] to structure [%v]", stateStr, stateJson)
-		return stateJson.Offset, stateJson.Topic, nil
+		return stateJson.Topology.Name, stateJson.Offset, stateJson.Topic, nil
 	} else {
-		return -1, "", err
+		return "", -1, "", err
 	}
 }
 
@@ -147,7 +147,7 @@ func (stormClient *StormClient) getOffsetsForPartition(consumerGroup string, par
 	//currentTimeMillis := currentTime.UnixNano() / int64(time.Millisecond)
 	switch {
 	case err == nil:
-		offset, topic, errConversion := parseStormSpoutStateJson(string(stateStr))
+		topology, offset, topic, errConversion := parseStormSpoutStateJson(string(stateStr))
 		switch {
 		case errConversion == nil:
 			log.Debugf("About to sync Storm offset: [%s,%s,%v]::[%v,%v]\n", consumerGroup, topic, partition, offset, zkNodeStat.Mtime)
@@ -158,7 +158,7 @@ func (stormClient *StormClient) getOffsetsForPartition(consumerGroup string, par
 			partitionOffset := &protocol.PartitionOffset{
 				Cluster:   stormClient.cluster,
 				Topic:     topic,
-				Source:    "storm",
+				Source:    "storm:" + topology,
 				Partition: int32(partition),
 				Group:     consumerGroup,
 				Timestamp: int64(zkNodeStat.Mtime), // note: this is millis
