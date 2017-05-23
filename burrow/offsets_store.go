@@ -27,8 +27,10 @@ type OffsetStorage struct {
 	offsetChannel  chan *protocol.PartitionOffset
 	requestChannel chan interface{}
 	offsets        map[string]*ClusterOffsets
-	groupBlacklist *regexp.Regexp
-	groupWhitelist *regexp.Regexp
+	// this is where you save the last broker Offset
+	lastBrokerOffsets map[string]*BrokerOffset
+	groupBlacklist    *regexp.Regexp
+	groupWhitelist    *regexp.Regexp
 }
 
 type BrokerOffset struct {
@@ -89,11 +91,12 @@ type RequestConsumerDrop struct {
 
 func NewOffsetStorage(app *ApplicationContext) (*OffsetStorage, error) {
 	storage := &OffsetStorage{
-		app:            app,
-		quit:           make(chan struct{}),
-		offsetChannel:  make(chan *protocol.PartitionOffset, 10000),
-		requestChannel: make(chan interface{}),
-		offsets:        make(map[string]*ClusterOffsets),
+		app:               app,
+		quit:              make(chan struct{}),
+		offsetChannel:     make(chan *protocol.PartitionOffset, 10000),
+		requestChannel:    make(chan interface{}),
+		offsets:           make(map[string]*ClusterOffsets),
+		lastBrokerOffsets: make(map[string]*BrokerOffset),
 	}
 
 	if app.Config.General.GroupBlacklist != "" {
@@ -194,6 +197,8 @@ func (storage *OffsetStorage) addBrokerOffset(offset *protocol.PartitionOffset) 
 		partitionEntry.Offset = offset.Offset
 		partitionEntry.Timestamp = offset.Timestamp
 	}
+
+	lastBrokerOffsets := storage.lastBrokerOffsets
 
 	clusterMap.brokerLock.Unlock()
 }
@@ -314,8 +319,8 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 		consumerTopicMap[offset.Partition] = ring.New(storage.app.Config.Lagcheck.Intervals)
 		consumerPartitionRing = consumerTopicMap[offset.Partition]
 	} else {
-		lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
-		timestampDifference = offset.Timestamp - lastOffset.Timestamp
+		//lastOffset := consumerPartitionRing.Prev().Value.(*protocol.ConsumerOffset)
+
 		rate = float64(lastOffset.Offset-offset.Offset) / float64(timestampDifference)
 		// // Prevent old offset commits, but only if the offsets don't advance (because of artifical commits below)
 		// if (timestampDifference <= 0) && (offset.Offset <= lastOffset.Offset) {
@@ -339,7 +344,7 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 	log.Debugf("Calculating lag for group=%s, %s:%d", offset.Group, offset.Topic, offset.Partition)
 
 	// Calculate the lag against the brokerOffset
-	partitionLag := brokerOffset - offset.Offset
+	partitionLag := brokerOffset - lastOffset.Offset
 
 	if partitionLag < 0 {
 		// Little bit of a hack - because we only get broker offsets periodically, it's possible the consumer offset could be ahead of where we think the broker
@@ -348,11 +353,12 @@ func (storage *OffsetStorage) addConsumerOffset(offset *protocol.PartitionOffset
 
 	}
 
-	lagTime := int64(float64(brokerOffset-offset.Offset) / rate)
+	lagTime = 0
+	if rate != 0 {
+		lagTime = int64(float64(brokerOffset-offset.Offset) / rate)
 
-	if timestampDifference < 0 {
-		timestampDifference = 0
 	}
+
 	log.Debugf("Calculated lag for group=%s, %s:%d, lag=%d, timelag=%d (ms)", offset.Group, offset.Topic, offset.Partition, partitionLag, lagTime)
 	if lagTime < 0 {
 		lagTime = 0
